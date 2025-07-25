@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, useMemo } from 'react';
 import { cn } from "@/lib/utils";
 
 type WordSearchGridProps = {
@@ -23,17 +23,15 @@ const WordSearchGrid = ({
   const [isSelecting, setIsSelecting] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
   
-  const foundWordCells = new Set<string>();
-  puzzleWords.forEach(word => {
-    if (foundWords.includes(word)) {
-      // This is a simplified way to get cell coordinates.
-      // A full implementation would need the starting position and direction from the generator.
-      // For this UI, we assume we can get them. For now, we'll just check if a cell is part of any found word.
-    }
-  });
+  const foundWordCells = useMemo(() => {
+    // This part is complex and depends on having the paths of found words.
+    // Since we don't have that from the props, we cannot highlight found words' paths permanently.
+    // The current implementation highlights during selection.
+    return new Set<string>();
+  }, [foundWords, puzzleWords]);
 
 
-  const getCellCoordsFromEvent = (e: React.MouseEvent | React.TouchEvent) => {
+  const getCellCoordsFromEvent = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
     if (!gridRef.current) return null;
     const rect = gridRef.current.getBoundingClientRect();
 
@@ -56,8 +54,8 @@ const WordSearchGrid = ({
     }
     return null;
   };
-  
-  const handleMouseDown = (e: React.MouseEvent) => {
+
+  const handleInteractionStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     const coords = getCellCoordsFromEvent(e);
     if(coords) {
@@ -66,8 +64,9 @@ const WordSearchGrid = ({
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isSelecting) return;
+  const handleInteractionMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isSelecting || !selection[0]) return;
+    
     const startCell = selection[0];
     const endCoords = getCellCoordsFromEvent(e);
 
@@ -78,57 +77,57 @@ const WordSearchGrid = ({
         const dx = endX - startX;
         const dy = endY - startY;
 
-        if (dx === 0 && dy === 0) {
-            onSelectionChange([startCell]);
-            return;
-        }
-
+        // Straight lines (horizontal, vertical, or 45-degree diagonal)
         if (dx === 0 || dy === 0 || Math.abs(dx) === Math.abs(dy)) {
             const steps = Math.max(Math.abs(dx), Math.abs(dy));
-            const xInc = dx / steps;
-            const yInc = dy / steps;
-
+            const xInc = dx === 0 ? 0 : dx / steps;
+            const yInc = dy === 0 ? 0 : dy / steps;
+            
             for (let i = 0; i <= steps; i++) {
-                path.push([startY + Math.round(i * yInc), startX + Math.round(i * xInc)]);
+                const nextY = startY + Math.round(i * yInc);
+                const nextX = startX + Math.round(i * xInc);
+                // Check to prevent duplicate cells in the path
+                if (!path.find(p => p[0] === nextY && p[1] === nextX)) {
+                    path.push([nextY, nextX]);
+                }
             }
             onSelectionChange(path);
         }
     }
   };
-
-  const handleMouseUp = () => {
+  
+  const handleInteractionEnd = () => {
     if (isSelecting) {
       setIsSelecting(false);
       onSelectionEnd();
     }
   };
   
+  useEffect(() => {
+    const upListener = (e: MouseEvent | TouchEvent) => handleInteractionEnd();
+    
+    window.addEventListener('mouseup', upListener);
+    window.addEventListener('touchend', upListener);
+
+    return () => {
+      window.removeEventListener('mouseup', upListener);
+      window.removeEventListener('touchend', upListener);
+    };
+  }, [isSelecting, onSelectionEnd]);
+  
   const isCellInSelection = (row: number, col: number) => {
     return selection.some(cell => cell[0] === row && cell[1] === col);
   };
-
-  const isCellInFoundWord = (row: number, col: number) => {
-    // This is a placeholder. A robust solution needs the generator to provide word coordinates.
-    // For now, this will not highlight found words, but the logic is here.
-    return false; 
-  };
-
-  useEffect(() => {
-    const endSelection = () => handleMouseUp();
-    window.addEventListener('mouseup', endSelection);
-    return () => {
-      window.removeEventListener('mouseup', endSelection);
-    };
-  }, [isSelecting]);
 
   return (
     <div
       ref={gridRef}
       className="grid aspect-square w-full touch-none select-none rounded-lg border bg-card p-2 shadow-inner"
       style={{ gridTemplateColumns: `repeat(${grid.length}, minmax(0, 1fr))` }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseUp}
+      onMouseDown={handleInteractionStart}
+      onMouseMove={handleInteractionMove}
+      onTouchStart={handleInteractionStart}
+      onTouchMove={handleInteractionMove}
     >
       {grid.map((row, rowIndex) =>
         row.map((letter, colIndex) => (
@@ -136,8 +135,9 @@ const WordSearchGrid = ({
             key={`${rowIndex}-${colIndex}`}
             className={cn(
               "flex aspect-square items-center justify-center rounded-md text-lg md:text-xl font-bold font-mono transition-colors duration-150",
-              isCellInSelection(rowIndex, colIndex) ? "bg-primary text-primary-foreground scale-110" : "bg-secondary",
-              isCellInFoundWord(rowIndex, colIndex) && "bg-accent text-accent-foreground"
+              isCellInSelection(rowIndex, colIndex) ? "bg-primary text-primary-foreground scale-110 shadow-lg" : "bg-background",
+              // This part for permanently highlighting found words is not fully implemented
+              // as the component doesn't receive the necessary path data.
             )}
             data-row={rowIndex}
             data-col={colIndex}

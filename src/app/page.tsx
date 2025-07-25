@@ -1,20 +1,21 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Clock, Trophy, Award, Search, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, Trophy, Award, Search } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { generatePuzzle, levels, Level } from '@/lib/puzzle-generator';
+import { generatePuzzle, levels } from '@/lib/puzzle-generator';
 import WordSearchGrid from '@/components/word-search-grid';
 import WordList from '@/components/word-list';
 import { useToast } from "@/hooks/use-toast";
 import Confetti from 'react-confetti';
+import Logo from '@/components/icons/logo';
 
 type GameState = 'start' | 'playing' | 'level-complete' | 'game-over';
 type Puzzle = {
   grid: string[][];
-  words: string[];
+  words: { word: string, path: [number, number][] }[];
 };
 
 export default function HomePage() {
@@ -27,6 +28,7 @@ export default function HomePage() {
   const [selection, setSelection] = useState<[number, number][]>([]);
   const { toast } = useToast();
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  const [isGameOver, setIsGameOver] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -48,6 +50,7 @@ export default function HomePage() {
     setTimeLeft(config.time);
     setFoundWords([]);
     setSelection([]);
+    setIsGameOver(false);
     setGameState('playing');
   }, []);
 
@@ -59,6 +62,7 @@ export default function HomePage() {
       return () => clearInterval(timer);
     } else if (gameState === 'playing' && timeLeft === 0) {
       setGameState('game-over');
+      setIsGameOver(true);
     }
   }, [gameState, timeLeft]);
 
@@ -83,20 +87,25 @@ export default function HomePage() {
   }, [foundWords, puzzle, timeLeft, toast]);
 
   const handleSelectionEnd = useCallback(() => {
-    if (!puzzle) return;
+    if (!puzzle || selection.length < 2) {
+      setSelection([]);
+      return;
+    };
 
-    let forwardWord = '';
-    let backwardWord = '';
-    for (const cell of selection) {
-      forwardWord += puzzle.grid[cell[0]][cell[1]];
+    const puzzleWords = puzzle.words;
+    
+    const isSamePath = (path1: [number, number][], path2: [number, number][]) => {
+        if(path1.length !== path2.length) return false;
+        return path1.every((p, i) => p[0] === path2[i][0] && p[1] === path2[i][1]);
     }
-    backwardWord = forwardWord.split('').reverse().join('');
 
-    const wordToFind = puzzle.words.find(w => w === forwardWord || w === backwardWord);
-
-    if (wordToFind) {
-      handleWordFound(wordToFind);
+    for(const puzzleWord of puzzleWords) {
+        if(isSamePath(puzzleWord.path, selection) || isSamePath(puzzleWord.path, [...selection].reverse())) {
+            handleWordFound(puzzleWord.word);
+            break;
+        }
     }
+
     setSelection([]);
   }, [selection, puzzle, handleWordFound]);
 
@@ -105,6 +114,7 @@ export default function HomePage() {
       startLevel(level + 1);
     } else {
       setGameState('game-over');
+      setIsGameOver(true);
     }
   };
   
@@ -136,22 +146,22 @@ export default function HomePage() {
         </Dialog>
       );
     }
-    if (gameState === 'game-over') {
+    if (isGameOver) {
       return (
-        <Dialog open={true}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-2xl">
-                <XCircle className="text-destructive" /> Fim de Jogo!
-              </DialogTitle>
-              <DialogDescription>
-                O tempo acabou ou você concluiu todos os níveis! Sua pontuação final é {score}.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button onClick={restartGame}>Jogar Novamente</Button>
-            </DialogFooter>
-          </DialogContent>
+        <Dialog open={true} onOpenChange={(open) => !open && setIsGameOver(false)}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-2xl">
+                    Fim de Jogo!
+                </DialogTitle>
+                <DialogDescription>
+                    {timeLeft === 0 ? "O tempo acabou!" : "Você completou todos os níveis!"} Sua pontuação final é {score}.
+                </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                <Button onClick={restartGame}>Jogar Novamente</Button>
+                </DialogFooter>
+            </DialogContent>
         </Dialog>
       );
     }
@@ -161,24 +171,28 @@ export default function HomePage() {
   const renderGameContent = () => {
     if (gameState === 'start' || !puzzle) {
       return (
-        <div className="flex flex-col items-center justify-center h-full gap-8 text-center">
+        <div className="flex flex-col items-center justify-center h-full gap-8 text-center p-4">
             <div className="flex flex-col items-center">
-                <Search size={80} className="text-primary mb-4"/>
-                <h1 className="text-5xl font-bold font-headline">Caça Time</h1>
+                <Logo />
                 <p className="text-muted-foreground mt-2 text-lg">Encontre as palavras antes que o tempo acabe!</p>
             </div>
-            <Button size="lg" onClick={restartGame}>Iniciar Jogo</Button>
+            <Button size="lg" onClick={restartGame} className="gap-2">
+                <Search />
+                Iniciar Jogo
+            </Button>
         </div>
       );
     }
 
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full p-4 md:p-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full max-w-7xl mx-auto p-4 md:p-8">
         <div className="lg:col-span-2">
             <Card className="shadow-lg">
                 <CardHeader>
                     <div className="flex flex-wrap justify-between items-center gap-4">
-                        <CardTitle className="text-2xl font-headline">Encontre as Palavras</CardTitle>
+                        <CardTitle className="text-2xl font-headline flex items-center gap-3">
+                           <Logo />
+                        </CardTitle>
                         <div className="flex items-center gap-4 text-lg">
                              <div className="flex items-center gap-2 font-bold text-primary">
                                 <Clock size={20} />
@@ -198,8 +212,8 @@ export default function HomePage() {
                 <CardContent>
                     <WordSearchGrid
                         grid={puzzle.grid}
+                        puzzleWords={puzzle.words.map(p => p.word)}
                         foundWords={foundWords}
-                        puzzleWords={puzzle.words}
                         selection={selection}
                         onSelectionChange={setSelection}
                         onSelectionEnd={handleSelectionEnd}
@@ -208,7 +222,7 @@ export default function HomePage() {
             </Card>
         </div>
         <div className="lg:col-span-1">
-            <WordList words={puzzle.words} foundWords={foundWords} />
+            <WordList words={puzzle.words.map(p => p.word)} foundWords={foundWords} />
         </div>
       </div>
     );

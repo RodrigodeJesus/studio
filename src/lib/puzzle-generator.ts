@@ -22,13 +22,9 @@ const dictionary: string[] = [
 
 const directions = [
   { x: 1, y: 0 },   // Horizontal
-  { x: -1, y: 0 },  // Horizontal reverso
   { x: 0, y: 1 },   // Vertical
-  { x: 0, y: -1 },  // Vertical reverso
   { x: 1, y: 1 },   // Diagonal
-  { x: -1, y: -1 }, // Diagonal reverso
-  { x: 1, y: -1 },  // Diagonal reverso
-  { x: -1, y: 1 },  // Diagonal reverso
+  { x: -1, y: 1 },  // Diagonal invertida
 ];
 
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -47,9 +43,10 @@ export const generatePuzzle = (config: Level) => {
     .filter(word => word.length <= gridSize)
     .slice(0, numWords);
   
-  const placedWords: string[] = [];
+  const placedWords: { word: string; path: [number, number][] }[] = [];
 
   for (const word of wordsForPuzzle) {
+    const wordToPlace = Math.random() > 0.5 ? word : word.split('').reverse().join('');
     let placed = false;
     const shuffledDirections = shuffleArray([...directions]);
 
@@ -63,16 +60,18 @@ export const generatePuzzle = (config: Level) => {
         let x = startX;
         let y = startY;
         let canPlace = true;
+        const path: [number, number][] = [];
         
-        for (let i = 0; i < word.length; i++) {
+        for (let i = 0; i < wordToPlace.length; i++) {
           if (
             y < 0 || y >= gridSize ||
             x < 0 || x >= gridSize ||
-            (grid[y][x] !== null && grid[y][x] !== word[i])
+            (grid[y][x] !== null && grid[y][x] !== wordToPlace[i])
           ) {
             canPlace = false;
             break;
           }
+          path.push([y, x]);
           y += direction.y;
           x += direction.x;
         }
@@ -80,13 +79,13 @@ export const generatePuzzle = (config: Level) => {
         if (canPlace) {
           y = startY;
           x = startX;
-          for (let i = 0; i < word.length; i++) {
-            grid[y][x] = word[i];
+          for (let i = 0; i < wordToPlace.length; i++) {
+            grid[y][x] = wordToPlace[i];
             y += direction.y;
             x += direction.x;
           }
           placed = true;
-          placedWords.push(word);
+          placedWords.push({ word: word, path: path });
           break;
         }
       }
