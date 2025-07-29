@@ -13,14 +13,14 @@ import { useToast } from "@/hooks/use-toast";
 import Confetti from 'react-confetti';
 import Logo from '@/components/icons/logo';
 
-const BannerAd = () => {
+const BannerAd = ({ adKey }: { adKey: number }) => {
     useEffect(() => {
         try {
             ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
         } catch (err) {
             console.error("AdSense Banner Error:", err);
         }
-    }, []);
+    }, [adKey]);
 
     return (
         <div className="fixed bottom-0 left-0 w-full h-[50px] bg-gray-200 flex items-center justify-center text-sm text-gray-600 z-50">
@@ -36,7 +36,6 @@ const InterstitialAd = ({ open, onClose }: { open: boolean, onClose: () => void 
     useEffect(() => {
         if (open) {
             try {
-                // We are trying to push the ad only when the dialog is open.
                 ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
             } catch (err) {
                 console.error("AdSense Interstitial Error:", err);
@@ -109,6 +108,7 @@ export default function SoloPage() {
     setSelection([]);
     setIsGameOver(false);
     setGameState('playing');
+    setAdKey(prev => prev + 1); // Refresh banner ad key
   }, []);
 
   const handleGameOver = useCallback(() => {
@@ -116,7 +116,7 @@ export default function SoloPage() {
     const newMatchesFinished = matchesFinished + 1;
     setMatchesFinished(newMatchesFinished);
     if (!isFirstGame && newMatchesFinished > 0 && newMatchesFinished % 3 === 0) {
-        setAdKey(prev => prev + 1); // Change key to remount the ad component
+        setAdKey(prev => prev + 1);
         setShowInterstitial(true);
     } else {
         setIsGameOver(true);
@@ -201,11 +201,12 @@ export default function SoloPage() {
     setSelection([]);
     setIsGameOver(false);
     setGameState('playing');
+    setAdKey(prev => prev + 1);
   };
 
   const handleStartFirstGame = () => {
      if (isFirstGame) {
-      setAdKey(prev => prev + 1); // Change key to remount the ad component
+      setAdKey(prev => prev + 1); 
       setShowInterstitial(true);
     } else {
       startGame();
@@ -335,10 +336,12 @@ export default function SoloPage() {
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
-      <InterstitialAd key={adKey} open={showInterstitial} onClose={closeInterstitialAndHandleState} />
+      {showInterstitial && <InterstitialAd key={adKey} open={showInterstitial} onClose={closeInterstitialAndHandleState} />}
       {renderDialog()}
       {renderGameContent()}
-      {gameState === 'playing' && <BannerAd />}
+      {gameState === 'playing' && <BannerAd key={adKey} />}
     </main>
   );
 }
+
+    
