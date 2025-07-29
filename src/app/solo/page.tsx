@@ -17,7 +17,7 @@ const BannerAd = () => {
         try {
             ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
         } catch (err) {
-            console.error(err);
+            console.error("AdSense Banner Error:", err);
         }
     }, []);
 
@@ -36,7 +36,7 @@ const InterstitialAd = ({ onClose }: { onClose: () => void }) => {
         try {
             ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
         } catch (err) {
-            console.error(err);
+            console.error("AdSense Interstitial Error:", err);
         }
     }, []);
 
@@ -62,11 +62,11 @@ const InterstitialAd = ({ onClose }: { onClose: () => void }) => {
 
 
 export default function SoloPage() {
-  const [gameState, setGameState] = useState<GameState>('start');
+  const [gameState, setGameState] = useState<'start' | 'playing' | 'level-complete' | 'game-over'>('start');
   const [level, setLevel] = useState(1);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
+  const [puzzle, setPuzzle] = useState<{ grid: string[][]; words: { word: string; path: [number, number][]; }[]; } | null>(null);
   const [foundWords, setFoundWords] = useState<string[]>([]);
   const [selection, setSelection] = useState<[number, number][]>([]);
   const { toast } = useToast();
@@ -74,6 +74,7 @@ export default function SoloPage() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [matchesFinished, setMatchesFinished] = useState(0);
   const [showInterstitial, setShowInterstitial] = useState(false);
+  const [isFirstGame, setIsFirstGame] = useState(true);
 
   useEffect(() => {
     const handleResize = () => {
@@ -88,12 +89,7 @@ export default function SoloPage() {
   
   const currentLevelConfig = useMemo(() => levels.find(l => l.level === level) || levels[levels.length - 1], [level]);
 
-  const startLevel = useCallback((levelNum: number, isFirstGame: boolean = false) => {
-    if (isFirstGame) {
-        setShowInterstitial(true); // Show "App Open" ad
-        // We'll proceed to start the game when the ad is closed
-        return;
-    }
+  const startLevel = useCallback((levelNum: number) => {
     const config = levels.find(l => l.level === levelNum) || levels[levels.length - 1];
     setLevel(levelNum);
     setPuzzle(generatePuzzle(config));
@@ -106,11 +102,12 @@ export default function SoloPage() {
 
   const handleGameOver = useCallback(() => {
     setGameState('game-over');
-    setIsGameOver(true);
     const newMatchesFinished = matchesFinished + 1;
     setMatchesFinished(newMatchesFinished);
     if (newMatchesFinished > 0 && newMatchesFinished % 3 === 0) {
         setShowInterstitial(true);
+    } else {
+        setIsGameOver(true);
     }
   }, [matchesFinished]);
 
@@ -182,8 +179,7 @@ export default function SoloPage() {
     }
   };
   
-  const startGameAfterAd = () => {
-    setShowInterstitial(false);
+  const startGame = () => {
     const config = levels.find(l => l.level === 1)!;
     setLevel(1);
     setScore(0);
@@ -193,18 +189,24 @@ export default function SoloPage() {
     setSelection([]);
     setIsGameOver(false);
     setGameState('playing');
+    if (isFirstGame) {
+      setIsFirstGame(false);
+    }
   };
 
   const restartGame = () => {
-    setScore(0);
-    startLevel(1, true); // Pass true to indicate it's the first game start
+    if (isFirstGame) {
+        setShowInterstitial(true);
+    } else {
+        startGame();
+    }
   };
 
   const closeInterstitialAndHandleState = () => {
     setShowInterstitial(false);
     // If it was the "app open" ad, start the game.
-    if(gameState === 'start') {
-        startGameAfterAd();
+    if(isFirstGame) {
+        startGame();
     }
     // Otherwise, it was a regular interstitial, just show the game over dialog.
     else {
@@ -240,7 +242,7 @@ export default function SoloPage() {
     }
     if (isGameOver && !showInterstitial) {
       return (
-        <Dialog open={true} onOpenChange={(open) => !open && setIsGameOver(false)}>
+        <Dialog open={true} onOpenChange={(open) => !open && setGameState('start')}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-2xl">
@@ -251,7 +253,12 @@ export default function SoloPage() {
                 </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
-                <Button onClick={restartGame}>Jogar Novamente</Button>
+                  <Button onClick={() => {
+                      setIsGameOver(false);
+                      setMatchesFinished(0); // Reset for ads
+                      setIsFirstGame(true); // Reset for app-open ad logic
+                      setGameState('start');
+                  }}>Voltar ao Início</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
