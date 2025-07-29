@@ -113,12 +113,12 @@ export default function SoloPage() {
     setGameState('game-over');
     const newMatchesFinished = matchesFinished + 1;
     setMatchesFinished(newMatchesFinished);
-    if (newMatchesFinished > 0 && newMatchesFinished % 3 === 0) {
+    if (!isFirstGame && newMatchesFinished > 0 && newMatchesFinished % 3 === 0) {
         setShowInterstitial(true);
     } else {
         setIsGameOver(true);
     }
-  }, [matchesFinished]);
+  }, [matchesFinished, isFirstGame]);
 
   useEffect(() => {
     if (gameState === 'playing' && timeLeft > 0) {
@@ -198,26 +198,22 @@ export default function SoloPage() {
     setSelection([]);
     setIsGameOver(false);
     setGameState('playing');
-    if (isFirstGame) {
-      setIsFirstGame(false);
-    }
   };
 
-  const restartGame = () => {
-    if (isFirstGame) {
-        setShowInterstitial(true);
+  const handleStartFirstGame = () => {
+     if (isFirstGame) {
+      setShowInterstitial(true);
     } else {
-        startGame();
+      startGame();
     }
   };
 
   const closeInterstitialAndHandleState = () => {
     setShowInterstitial(false);
-    // If it was the "app open" ad, start the game.
     if(isFirstGame) {
+        setIsFirstGame(false);
         startGame();
     }
-    // Otherwise, it was a regular interstitial, just show the game over dialog.
     else {
         setIsGameOver(true);
     }
@@ -261,8 +257,8 @@ export default function SoloPage() {
                 <DialogFooter>
                   <Button onClick={() => {
                       setIsGameOver(false);
-                      setMatchesFinished(0); // Reset for ads
-                      setIsFirstGame(true); // Reset for app-open ad logic
+                      setMatchesFinished(0);
+                      setIsFirstGame(true);
                       setGameState('start');
                   }}>Voltar ao Início</Button>
                 </DialogFooter>
@@ -281,7 +277,7 @@ export default function SoloPage() {
                 <Logo />
                 <p className="text-muted-foreground mt-2 text-lg">Encontre as palavras antes que o tempo acabe!</p>
             </div>
-            <Button size="lg" onClick={restartGame} className="gap-2">
+            <Button size="lg" onClick={handleStartFirstGame} className="gap-2">
                 <Search />
                 Iniciar Jogo
             </Button>
