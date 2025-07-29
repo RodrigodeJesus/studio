@@ -12,32 +12,53 @@ import { useToast } from "@/hooks/use-toast";
 import Confetti from 'react-confetti';
 import Logo from '@/components/icons/logo';
 
-type GameState = 'start' | 'playing' | 'level-complete' | 'game-over';
-type Puzzle = {
-  grid: string[][];
-  words: { word: string, path: [number, number][] }[];
+const BannerAd = () => {
+    useEffect(() => {
+        try {
+            ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+        } catch (err) {
+            console.error(err);
+        }
+    }, []);
+
+    return (
+        <div className="fixed bottom-0 left-0 w-full h-[50px] bg-gray-200 flex items-center justify-center text-sm text-gray-600 z-50">
+            <ins className="adsbygoogle"
+                 style={{ display: 'inline-block', width: '320px', height: '50px' }}
+                 data-ad-client="ca-pub-3940256099942544"
+                 data-ad-slot="9214589741"></ins>
+        </div>
+    );
 };
 
-const BannerAd = () => (
-    <div className="fixed bottom-0 left-0 w-full h-[50px] bg-gray-200 flex items-center justify-center text-sm text-gray-600 z-50">
-        <p>Publicidade (Banner 320x50)</p>
-    </div>
-);
+const InterstitialAd = ({ onClose }: { onClose: () => void }) => {
+    useEffect(() => {
+        try {
+            ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+        } catch (err) {
+            console.error(err);
+        }
+    }, []);
 
-const InterstitialAd = ({ onClose }: { onClose: () => void }) => (
-    <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-        <div className="bg-background rounded-lg p-6 text-center relative max-w-sm w-full">
-            <h3 className="text-lg font-bold mb-2">Anúncio</h3>
-            <p className="text-muted-foreground mb-4">Obrigado por jogar! O jogo continuará após este anúncio.</p>
-            <div className="w-full h-64 bg-gray-200 flex items-center justify-center text-gray-500 rounded-md mb-4">
-                Conteúdo do anúncio em tela cheia
+    return (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+            <div className="bg-background rounded-lg p-6 text-center relative max-w-sm w-full">
+                <h3 className="text-lg font-bold mb-2">Anúncio</h3>
+                <div className="w-full h-64 bg-gray-200 flex items-center justify-center text-gray-500 rounded-md mb-4">
+                   <ins className="adsbygoogle"
+                        style={{ display: 'block' }}
+                        data-ad-client="ca-pub-3940256099942544"
+                        data-ad-slot="1033173712"
+                        data-ad-format="auto"
+                        data-full-width-responsive="true"></ins>
+                </div>
+                <Button onClick={onClose} variant="outline">
+                    Fechar Anúncio
+                </Button>
             </div>
-            <Button onClick={onClose} variant="outline">
-                Fechar Anúncio
-            </Button>
         </div>
-    </div>
-);
+    );
+};
 
 
 export default function SoloPage() {
@@ -67,7 +88,12 @@ export default function SoloPage() {
   
   const currentLevelConfig = useMemo(() => levels.find(l => l.level === level) || levels[levels.length - 1], [level]);
 
-  const startLevel = useCallback((levelNum: number) => {
+  const startLevel = useCallback((levelNum: number, isFirstGame: boolean = false) => {
+    if (isFirstGame) {
+        setShowInterstitial(true); // Show "App Open" ad
+        // We'll proceed to start the game when the ad is closed
+        return;
+    }
     const config = levels.find(l => l.level === levelNum) || levels[levels.length - 1];
     setLevel(levelNum);
     setPuzzle(generatePuzzle(config));
@@ -83,7 +109,7 @@ export default function SoloPage() {
     setIsGameOver(true);
     const newMatchesFinished = matchesFinished + 1;
     setMatchesFinished(newMatchesFinished);
-    if (newMatchesFinished % 3 === 0) {
+    if (newMatchesFinished > 0 && newMatchesFinished % 3 === 0) {
         setShowInterstitial(true);
     }
   }, [matchesFinished]);
@@ -156,23 +182,39 @@ export default function SoloPage() {
     }
   };
   
-  const restartGame = () => {
+  const startGameAfterAd = () => {
+    setShowInterstitial(false);
+    const config = levels.find(l => l.level === 1)!;
+    setLevel(1);
     setScore(0);
-    startLevel(1);
+    setPuzzle(generatePuzzle(config));
+    setTimeLeft(config.time);
+    setFoundWords([]);
+    setSelection([]);
+    setIsGameOver(false);
+    setGameState('playing');
   };
 
-  const closeInterstitialAndRestart = () => {
+  const restartGame = () => {
+    setScore(0);
+    startLevel(1, true); // Pass true to indicate it's the first game start
+  };
+
+  const closeInterstitialAndHandleState = () => {
     setShowInterstitial(false);
-    restartGame();
+    // If it was the "app open" ad, start the game.
+    if(gameState === 'start') {
+        startGameAfterAd();
+    }
+    // Otherwise, it was a regular interstitial, just show the game over dialog.
+    else {
+        setIsGameOver(true);
+    }
   };
 
   const renderDialog = () => {
     if (showInterstitial) {
-        return <InterstitialAd onClose={() => {
-            setShowInterstitial(false);
-            // After closing ad, show the game over dialog
-            setIsGameOver(true);
-        }} />;
+        return <InterstitialAd onClose={closeInterstitialAndHandleState} />;
     }
     if (gameState === 'level-complete') {
       return (
