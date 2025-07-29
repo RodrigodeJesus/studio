@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Clock, Trophy, Award, Search, X } from 'lucide-react';
+import { Clock, Trophy, Award, Search } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -31,20 +31,27 @@ const BannerAd = () => {
     );
 };
 
-const InterstitialAd = ({ onClose }: { onClose: () => void }) => {
+const InterstitialAd = ({ open, onClose }: { open: boolean, onClose: () => void }) => {
     useEffect(() => {
-        try {
-            ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
-        } catch (err) {
-            console.error("AdSense Interstitial Error:", err);
+        if (open) {
+            try {
+                // We are trying to push the ad only when the dialog is open.
+                ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+            } catch (err) {
+                console.error("AdSense Interstitial Error:", err);
+            }
         }
-    }, []);
+    }, [open]);
+
+    if (!open) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-            <div className="bg-background rounded-lg p-6 text-center relative max-w-sm w-full">
-                <h3 className="text-lg font-bold mb-2">Anúncio</h3>
-                <div className="w-full h-64 bg-gray-200 flex items-center justify-center text-gray-500 rounded-md mb-4">
+        <Dialog open={open} onOpenChange={onClose}>
+            <DialogContent className="max-w-sm w-full" onInteractOutside={(e) => e.preventDefault()}>
+                <DialogHeader>
+                    <DialogTitle className="text-center">Anúncio</DialogTitle>
+                </DialogHeader>
+                <div className="w-full h-64 bg-gray-200 flex items-center justify-center text-gray-500 rounded-md my-4">
                    <ins className="adsbygoogle"
                         style={{ display: 'block' }}
                         data-ad-client="ca-pub-3940256099942544"
@@ -52,11 +59,13 @@ const InterstitialAd = ({ onClose }: { onClose: () => void }) => {
                         data-ad-format="auto"
                         data-full-width-responsive="true"></ins>
                 </div>
-                <Button onClick={onClose} variant="outline">
-                    Fechar Anúncio
-                </Button>
-            </div>
-        </div>
+                <DialogFooter>
+                    <Button onClick={onClose} variant="outline" className="w-full">
+                        Fechar Anúncio
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 };
 
@@ -215,9 +224,6 @@ export default function SoloPage() {
   };
 
   const renderDialog = () => {
-    if (showInterstitial) {
-        return <InterstitialAd onClose={closeInterstitialAndHandleState} />;
-    }
     if (gameState === 'level-complete') {
       return (
         <Dialog open={true}>
@@ -329,6 +335,7 @@ export default function SoloPage() {
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
+      <InterstitialAd open={showInterstitial} onClose={closeInterstitialAndHandleState} />
       {renderDialog()}
       {renderGameContent()}
       {gameState === 'playing' && <BannerAd />}
