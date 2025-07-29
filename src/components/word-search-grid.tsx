@@ -131,7 +131,7 @@ const WordSearchGrid = ({
   return (
     <div
       ref={gridRef}
-      className="grid aspect-square w-full touch-none select-none rounded-lg border bg-card p-2 shadow-inner"
+      className="grid aspect-square w-full touch-none select-none rounded-lg border bg-card p-1 sm:p-2 shadow-inner mobile-grid"
       style={{ gridTemplateColumns: `repeat(${grid.length}, minmax(0, 1fr))` }}
       onMouseDown={handleInteractionStart}
       onMouseMove={handleInteractionMove}
@@ -143,7 +143,7 @@ const WordSearchGrid = ({
           <div
             key={`${rowIndex}-${colIndex}`}
             className={cn(
-              "flex aspect-square items-center justify-center rounded-md text-lg md:text-xl font-bold font-mono transition-colors duration-150",
+              "flex aspect-square items-center justify-center rounded-md text-sm sm:text-lg md:text-xl font-bold font-mono transition-colors duration-150",
               isCellInSelection(rowIndex, colIndex) 
                 ? "bg-primary text-primary-foreground scale-110 shadow-lg" 
                 : isCellInFoundWord(rowIndex, colIndex)

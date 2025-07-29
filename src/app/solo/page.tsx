@@ -12,63 +12,11 @@ import WordList from '@/components/word-list';
 import { useToast } from "@/hooks/use-toast";
 import Confetti from 'react-confetti';
 import Logo from '@/components/icons/logo';
-
-const BannerAd = ({ adKey }: { adKey: number }) => {
-    useEffect(() => {
-        try {
-            ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
-        } catch (err) {
-            console.error("AdSense Banner Error:", err);
-        }
-    }, [adKey]);
-
-    return (
-        <div className="fixed bottom-0 left-0 w-full h-[50px] bg-gray-200 flex items-center justify-center text-sm text-gray-600 z-50">
-            <ins className="adsbygoogle"
-                 style={{ display: 'inline-block', width: '320px', height: '50px' }}
-                 data-ad-client="ca-pub-3940256099942544"
-                 data-ad-slot="9214589741"></ins>
-        </div>
-    );
-};
-
-const InterstitialAd = ({ open, onClose }: { open: boolean, onClose: () => void }) => {
-    useEffect(() => {
-        if (open) {
-            try {
-                ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
-            } catch (err) {
-                console.error("AdSense Interstitial Error:", err);
-            }
-        }
-    }, [open]);
-
-    if (!open) return null;
-
-    return (
-        <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-w-sm w-full" onInteractOutside={(e) => e.preventDefault()}>
-                <DialogHeader>
-                    <DialogTitle className="text-center">Anúncio</DialogTitle>
-                </DialogHeader>
-                <div className="w-full h-64 bg-gray-200 flex items-center justify-center text-gray-500 rounded-md my-4">
-                   <ins className="adsbygoogle"
-                        style={{ display: 'block' }}
-                        data-ad-client="ca-pub-3940256099942544"
-                        data-ad-slot="1033173712"
-                        data-ad-format="auto"
-                        data-full-width-responsive="true"></ins>
-                </div>
-                <DialogFooter>
-                    <Button onClick={onClose} variant="outline" className="w-full">
-                        Fechar Anúncio
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-};
-
+import { useSubscription } from '@/hooks/use-subscription';
+import { useAdManager } from '@/hooks/use-ad-manager';
+import MobileBannerAd from '@/components/ui/mobile-banner-ad';
+import MobileInterstitialAd from '@/components/ui/mobile-interstitial-ad';
+import SubscriptionModal from '@/components/ui/subscription-modal';
 
 export default function SoloPage() {
   const [gameState, setGameState] = useState<'start' | 'playing' | 'level-complete' | 'game-over'>('start');
@@ -79,12 +27,17 @@ export default function SoloPage() {
   const [foundWords, setFoundWords] = useState<string[]>([]);
   const [selection, setSelection] = useState<[number, number][]>([]);
   const { toast } = useToast();
+  const { isPremium, subscribe } = useSubscription();
+  const { 
+    shouldShowBanner, 
+    shouldShowInterstitial, 
+    bannerKey, 
+    onGameFinished, 
+    closeInterstitial 
+  } = useAdManager();
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   const [isGameOver, setIsGameOver] = useState(false);
-  const [matchesFinished, setMatchesFinished] = useState(0);
-  const [showInterstitial, setShowInterstitial] = useState(false);
-  const [isFirstGame, setIsFirstGame] = useState(true);
-  const [adKey, setAdKey] = useState(0);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -113,15 +66,9 @@ export default function SoloPage() {
 
   const handleGameOver = useCallback(() => {
     setGameState('game-over');
-    const newMatchesFinished = matchesFinished + 1;
-    setMatchesFinished(newMatchesFinished);
-    if (!isFirstGame && newMatchesFinished > 0 && newMatchesFinished % 3 === 0) {
-        setAdKey(prev => prev + 1);
-        setShowInterstitial(true);
-    } else {
-        setIsGameOver(true);
-    }
-  }, [matchesFinished, isFirstGame]);
+    onGameFinished();
+    setIsGameOver(true);
+  }, [onGameFinished]);
 
   useEffect(() => {
     if (gameState === 'playing' && timeLeft > 0) {
@@ -149,10 +96,11 @@ export default function SoloPage() {
 
       if (puzzle && newFoundWords.length === puzzle.words.length) {
         setScore(s => s + timeLeft * 5); // Time bonus
+        onGameFinished();
         setGameState('level-complete');
       }
     }
-  }, [foundWords, puzzle, timeLeft, toast]);
+  }, [foundWords, puzzle, timeLeft, toast, onGameFinished]);
 
   const handleSelectionEnd = useCallback(() => {
     if (!puzzle || selection.length < 2) {
@@ -201,26 +149,22 @@ export default function SoloPage() {
     setSelection([]);
     setIsGameOver(false);
     setGameState('playing');
-    setAdKey(prev => prev + 1);
   };
 
-  const handleStartFirstGame = () => {
-     if (isFirstGame) {
-      setAdKey(prev => prev + 1); 
-      setShowInterstitial(true);
+  const handleSubscribe = async (plan: 'monthly' | 'yearly') => {
+    const result = await subscribe(plan);
+    if (result.success) {
+      toast({
+        title: "Assinatura ativada!",
+        description: "Agora você pode jogar sem anúncios!",
+      });
+      setShowSubscriptionModal(false);
     } else {
-      startGame();
-    }
-  };
-
-  const closeInterstitialAndHandleState = () => {
-    setShowInterstitial(false);
-    if(isFirstGame) {
-        setIsFirstGame(false);
-        startGame();
-    }
-    else {
-        setIsGameOver(true);
+      toast({
+        title: "Erro na assinatura",
+        description: result.error || "Tente novamente mais tarde.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -247,7 +191,7 @@ export default function SoloPage() {
         </Dialog>
       );
     }
-    if (isGameOver && !showInterstitial) {
+    if (isGameOver && !shouldShowInterstitial) {
       return (
         <Dialog open={true} onOpenChange={(open) => !open && setGameState('start')}>
             <DialogContent className="sm:max-w-md">
@@ -262,8 +206,6 @@ export default function SoloPage() {
                 <DialogFooter>
                   <Button onClick={() => {
                       setIsGameOver(false);
-                      setMatchesFinished(0);
-                      setIsFirstGame(true);
                       setGameState('start');
                   }}>Voltar ao Início</Button>
                 </DialogFooter>
@@ -280,36 +222,56 @@ export default function SoloPage() {
         <div className="flex flex-col items-center justify-center h-full gap-8 text-center p-4">
             <div className="flex flex-col items-center">
                 <Logo />
+                {isPremium && (
+                  <div className="flex items-center gap-1 mt-2 px-2 py-1 bg-primary/10 rounded-full">
+                    <Crown className="text-primary" size={14} />
+                    <span className="text-xs font-medium text-primary">Premium</span>
+                  </div>
+                )}
                 <p className="text-muted-foreground mt-2 text-lg">Encontre as palavras antes que o tempo acabe!</p>
             </div>
-            <Button size="lg" onClick={handleStartFirstGame} className="gap-2">
+            <div className="space-y-4 w-full max-w-xs">
+              <Button size="lg" onClick={startGame} className="gap-2 w-full">
                 <Search />
                 Iniciar Jogo
-            </Button>
+              </Button>
+              {!isPremium && (
+                <Button 
+                  size="lg" 
+                  variant="secondary" 
+                  className="w-full gap-2" 
+                  onClick={() => setShowSubscriptionModal(true)}
+                >
+                  <Crown />
+                  Jogar sem Anúncios
+                </Button>
+              )}
+            </div>
         </div>
       );
     }
 
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full max-w-7xl mx-auto p-4 md:p-8 mb-[50px]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 w-full max-w-7xl mx-auto p-4 mobile-optimized">
         <div className="lg:col-span-2">
             <Card className="shadow-lg">
                 <CardHeader>
-                    <div className="flex flex-wrap justify-between items-center gap-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                         <CardTitle className="text-2xl font-headline flex items-center gap-3">
                            <Logo />
+                           {isPremium && <Crown className="text-primary" size={20} />}
                         </CardTitle>
-                        <div className="flex items-center gap-4 text-lg">
+                        <div className="flex items-center gap-2 sm:gap-4 text-sm sm:text-lg">
                              <div className="flex items-center gap-2 font-bold text-primary">
-                                <Clock size={20} />
+                                <Clock size={16} className="sm:w-5 sm:h-5" />
                                 <span>{Math.floor(timeLeft / 60)}:{('0' + timeLeft % 60).slice(-2)}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Trophy size={20} />
+                                <Trophy size={16} className="sm:w-5 sm:h-5" />
                                 <span>{score}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Award size={20} />
+                                <Award size={16} className="sm:w-5 sm:h-5" />
                                 <span>Nível {level}</span>
                             </div>
                         </div>
@@ -335,11 +297,26 @@ export default function SoloPage() {
   };
 
   return (
-    <main className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
-      {showInterstitial && <InterstitialAd key={adKey} open={showInterstitial} onClose={closeInterstitialAndHandleState} />}
+    <main className="flex min-h-screen w-full flex-col items-center justify-center bg-background pb-16">
+      <MobileInterstitialAd 
+        open={shouldShowInterstitial} 
+        onClose={closeInterstitial}
+        adKey={bannerKey}
+      />
       {renderDialog()}
       {renderGameContent()}
-      {gameState === 'playing' && <BannerAd key={adKey} />}
+      
+      {gameState === 'playing' && shouldShowBanner && (
+        <div className="fixed bottom-16 left-0 right-0 z-40">
+          <MobileBannerAd adKey={bannerKey} />
+        </div>
+      )}
+      
+      <SubscriptionModal
+        open={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        onSubscribe={handleSubscribe}
+      />
     </main>
   );
 }

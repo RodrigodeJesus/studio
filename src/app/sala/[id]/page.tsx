@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Copy, User, Check, Crown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
+import { useSubscription } from '@/hooks/use-subscription';
+import { useAdManager } from '@/hooks/use-ad-manager';
+import MobileBannerAd from '@/components/ui/mobile-banner-ad';
 
 // Mock data
 const mockPlayers = [
@@ -19,6 +22,8 @@ export default function RoomPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const { isPremium } = useSubscription();
+  const { shouldShowBanner, bannerKey } = useAdManager();
   const roomCode = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const copyLink = () => {
@@ -41,7 +46,7 @@ export default function RoomPage() {
   };
 
   return (
-    <main className="flex min-h-screen w-full flex-col items-center bg-background p-4 sm:p-6">
+    <main className="flex min-h-screen w-full flex-col items-center bg-background p-4 sm:p-6 mobile-optimized">
       <div className="w-full max-w-2xl">
         <div className="flex items-center mb-6">
           <Button variant="ghost" size="icon" onClick={() => router.push('/')}>
@@ -49,6 +54,7 @@ export default function RoomPage() {
           </Button>
           <h1 className="text-3xl font-bold text-center flex-1">
             Sala de Espera
+            {isPremium && <Crown className="text-primary ml-2" size={24} />}
           </h1>
         </div>
 
@@ -108,6 +114,12 @@ export default function RoomPage() {
             </Button>
         </div>
       </div>
+      
+      {shouldShowBanner && (
+        <div className="fixed bottom-16 left-0 right-0 z-40">
+          <MobileBannerAd adKey={bannerKey} />
+        </div>
+      )}
     </main>
   );
 }

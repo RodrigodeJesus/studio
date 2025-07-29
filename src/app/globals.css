@@ -4,6 +4,7 @@
 
 body {
   font-family: var(--font-body), sans-serif;
+  padding-bottom: 64px; /* Espaço para o menu inferior */
 }
 
 @layer base {
@@ -68,5 +69,27 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Otimizações para mobile */
+@media (max-width: 768px) {
+  .mobile-optimized {
+    padding: 1rem;
+  }
+  
+  .mobile-grid {
+    gap: 0.5rem;
+  }
+  
+  .mobile-text {
+    font-size: 0.875rem;
+  }
+}
+
+/* Ajustes para telas pequenas */
+@media (max-height: 600px) {
+  body {
+    padding-bottom: 56px;
   }
 }

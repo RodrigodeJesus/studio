@@ -1,5 +1,6 @@
 import type {Metadata} from 'next';
 import { Toaster } from "@/components/ui/toaster"
+import BottomNavigation from '@/components/ui/bottom-navigation';
 import Script from 'next/script';
 import './globals.css';
 
@@ -28,6 +29,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         {children}
+        <BottomNavigation />
         <Toaster />
       </body>
     </html>
