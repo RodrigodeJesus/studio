@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -84,6 +85,7 @@ export default function SoloPage() {
   const [matchesFinished, setMatchesFinished] = useState(0);
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [isFirstGame, setIsFirstGame] = useState(true);
+  const [adKey, setAdKey] = useState(0);
 
   useEffect(() => {
     const handleResize = () => {
@@ -114,6 +116,7 @@ export default function SoloPage() {
     const newMatchesFinished = matchesFinished + 1;
     setMatchesFinished(newMatchesFinished);
     if (!isFirstGame && newMatchesFinished > 0 && newMatchesFinished % 3 === 0) {
+        setAdKey(prev => prev + 1); // Change key to remount the ad component
         setShowInterstitial(true);
     } else {
         setIsGameOver(true);
@@ -202,6 +205,7 @@ export default function SoloPage() {
 
   const handleStartFirstGame = () => {
      if (isFirstGame) {
+      setAdKey(prev => prev + 1); // Change key to remount the ad component
       setShowInterstitial(true);
     } else {
       startGame();
@@ -331,7 +335,7 @@ export default function SoloPage() {
 
   return (
     <main className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
-      <InterstitialAd open={showInterstitial} onClose={closeInterstitialAndHandleState} />
+      <InterstitialAd key={adKey} open={showInterstitial} onClose={closeInterstitialAndHandleState} />
       {renderDialog()}
       {renderGameContent()}
       {gameState === 'playing' && <BannerAd />}
