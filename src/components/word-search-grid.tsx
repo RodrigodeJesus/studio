@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef, memo, useMemo } from 'react';
 import { cn } from "@/lib/utils";
 
+type PuzzleWord = { word: string, path: [number, number][] };
+
 type WordSearchGridProps = {
   grid: string[][];
   foundWords: string[];
-  puzzleWords: string[];
+  puzzleWords: PuzzleWord[];
   selection: [number, number][];
   onSelectionChange: (selection: [number, number][]) => void;
   onSelectionEnd: () => void;
@@ -23,11 +25,14 @@ const WordSearchGrid = ({
   const [isSelecting, setIsSelecting] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
   
-  const foundWordCells = useMemo(() => {
-    // This part is complex and depends on having the paths of found words.
-    // Since we don't have that from the props, we cannot highlight found words' paths permanently.
-    // The current implementation highlights during selection.
-    return new Set<string>();
+  const foundWordPaths = useMemo(() => {
+    const paths = new Set<string>();
+    puzzleWords.forEach(puzzleWord => {
+      if (foundWords.includes(puzzleWord.word)) {
+        puzzleWord.path.forEach(([r, c]) => paths.add(`${r}-${c}`));
+      }
+    });
+    return paths;
   }, [foundWords, puzzleWords]);
 
 
@@ -118,6 +123,10 @@ const WordSearchGrid = ({
   const isCellInSelection = (row: number, col: number) => {
     return selection.some(cell => cell[0] === row && cell[1] === col);
   };
+  
+  const isCellInFoundWord = (row: number, col: number) => {
+    return foundWordPaths.has(`${row}-${col}`);
+  };
 
   return (
     <div
@@ -135,9 +144,11 @@ const WordSearchGrid = ({
             key={`${rowIndex}-${colIndex}`}
             className={cn(
               "flex aspect-square items-center justify-center rounded-md text-lg md:text-xl font-bold font-mono transition-colors duration-150",
-              isCellInSelection(rowIndex, colIndex) ? "bg-primary text-primary-foreground scale-110 shadow-lg" : "bg-background",
-              // This part for permanently highlighting found words is not fully implemented
-              // as the component doesn't receive the necessary path data.
+              isCellInSelection(rowIndex, colIndex) 
+                ? "bg-primary text-primary-foreground scale-110 shadow-lg" 
+                : isCellInFoundWord(rowIndex, colIndex)
+                ? "bg-primary/30 text-primary-foreground"
+                : "bg-background",
             )}
             data-row={rowIndex}
             data-col={colIndex}

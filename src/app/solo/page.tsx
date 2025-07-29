@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Clock, Trophy, Award, Search } from 'lucide-react';
+import { Clock, Trophy, Award, Search, X } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -18,6 +18,28 @@ type Puzzle = {
   words: { word: string, path: [number, number][] }[];
 };
 
+const BannerAd = () => (
+    <div className="fixed bottom-0 left-0 w-full h-[50px] bg-gray-200 flex items-center justify-center text-sm text-gray-600 z-50">
+        <p>Publicidade (Banner 320x50)</p>
+    </div>
+);
+
+const InterstitialAd = ({ onClose }: { onClose: () => void }) => (
+    <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+        <div className="bg-background rounded-lg p-6 text-center relative max-w-sm w-full">
+            <h3 className="text-lg font-bold mb-2">Anúncio</h3>
+            <p className="text-muted-foreground mb-4">Obrigado por jogar! O jogo continuará após este anúncio.</p>
+            <div className="w-full h-64 bg-gray-200 flex items-center justify-center text-gray-500 rounded-md mb-4">
+                Conteúdo do anúncio em tela cheia
+            </div>
+            <Button onClick={onClose} variant="outline">
+                Fechar Anúncio
+            </Button>
+        </div>
+    </div>
+);
+
+
 export default function SoloPage() {
   const [gameState, setGameState] = useState<GameState>('start');
   const [level, setLevel] = useState(1);
@@ -29,6 +51,8 @@ export default function SoloPage() {
   const { toast } = useToast();
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   const [isGameOver, setIsGameOver] = useState(false);
+  const [matchesFinished, setMatchesFinished] = useState(0);
+  const [showInterstitial, setShowInterstitial] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -54,6 +78,16 @@ export default function SoloPage() {
     setGameState('playing');
   }, []);
 
+  const handleGameOver = useCallback(() => {
+    setGameState('game-over');
+    setIsGameOver(true);
+    const newMatchesFinished = matchesFinished + 1;
+    setMatchesFinished(newMatchesFinished);
+    if (newMatchesFinished % 3 === 0) {
+        setShowInterstitial(true);
+    }
+  }, [matchesFinished]);
+
   useEffect(() => {
     if (gameState === 'playing' && timeLeft > 0) {
       const timer = setInterval(() => {
@@ -61,10 +95,9 @@ export default function SoloPage() {
       }, 1000);
       return () => clearInterval(timer);
     } else if (gameState === 'playing' && timeLeft === 0) {
-      setGameState('game-over');
-      setIsGameOver(true);
+      handleGameOver();
     }
-  }, [gameState, timeLeft]);
+  }, [gameState, timeLeft, handleGameOver]);
 
   const handleWordFound = useCallback((word: string) => {
     if (!foundWords.includes(word)) {
@@ -96,14 +129,19 @@ export default function SoloPage() {
     
     const isSamePath = (path1: [number, number][], path2: [number, number][]) => {
         if(path1.length !== path2.length) return false;
-        return path1.every((p, i) => p[0] === path2[i][0] && p[1] === path2[i][1]);
+        // Check both directions
+        const forwardMatch = path1.every((p, i) => p[0] === path2[i][0] && p[1] === path2[i][1]);
+        if(forwardMatch) return true;
+        const reversedPath2 = [...path2].reverse();
+        const backwardMatch = path1.every((p, i) => p[0] === reversedPath2[i][0] && p[1] === reversedPath2[i][1]);
+        return backwardMatch;
     }
 
     for(const puzzleWord of puzzleWords) {
-        const reversedSelection = [...selection].reverse();
-        if(isSamePath(puzzleWord.path, selection) || isSamePath(puzzleWord.path, reversedSelection)) {
+        if(isSamePath(puzzleWord.path, selection)) {
             handleWordFound(puzzleWord.word);
-            break;
+            setSelection([]);
+            return;
         }
     }
 
@@ -114,8 +152,7 @@ export default function SoloPage() {
     if (level < levels.length) {
       startLevel(level + 1);
     } else {
-      setGameState('game-over');
-      setIsGameOver(true);
+      handleGameOver();
     }
   };
   
@@ -124,7 +161,19 @@ export default function SoloPage() {
     startLevel(1);
   };
 
+  const closeInterstitialAndRestart = () => {
+    setShowInterstitial(false);
+    restartGame();
+  };
+
   const renderDialog = () => {
+    if (showInterstitial) {
+        return <InterstitialAd onClose={() => {
+            setShowInterstitial(false);
+            // After closing ad, show the game over dialog
+            setIsGameOver(true);
+        }} />;
+    }
     if (gameState === 'level-complete') {
       return (
         <Dialog open={true}>
@@ -147,7 +196,7 @@ export default function SoloPage() {
         </Dialog>
       );
     }
-    if (isGameOver) {
+    if (isGameOver && !showInterstitial) {
       return (
         <Dialog open={true} onOpenChange={(open) => !open && setIsGameOver(false)}>
             <DialogContent className="sm:max-w-md">
@@ -186,7 +235,7 @@ export default function SoloPage() {
     }
 
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full max-w-7xl mx-auto p-4 md:p-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full max-w-7xl mx-auto p-4 md:p-8 mb-[50px]">
         <div className="lg:col-span-2">
             <Card className="shadow-lg">
                 <CardHeader>
@@ -213,7 +262,7 @@ export default function SoloPage() {
                 <CardContent>
                     <WordSearchGrid
                         grid={puzzle.grid}
-                        puzzleWords={puzzle.words.map(p => p.word)}
+                        puzzleWords={puzzle.words}
                         foundWords={foundWords}
                         selection={selection}
                         onSelectionChange={setSelection}
@@ -233,6 +282,7 @@ export default function SoloPage() {
     <main className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
       {renderDialog()}
       {renderGameContent()}
+      {gameState === 'playing' && <BannerAd />}
     </main>
   );
 }
